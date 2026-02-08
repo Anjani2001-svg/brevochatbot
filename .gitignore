@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual env
+.venv/
+
+# Secrets
+.env
+
+# Local app state (chat history etc.)
+chat_memory_store*.json
+streamlit_chat_store*.json
+
+# Optional: exclude local DB/indexes if you rebuild them
+# *.db
+# faiss_index/
+# faiss_course_index/
