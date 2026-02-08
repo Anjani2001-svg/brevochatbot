@@ -1,5 +1,3 @@
-
-
 import os
 import re
 import json
@@ -408,7 +406,10 @@ def resolve_course_for_message(convo_id: str, text: str) -> str:
 SUBJECT_KEYWORDS = {
     "accounting": ["account", "accounting", "bookkeep", "bookkeeping", "finance", "payroll", "sage", "tax"],
     "childcare": ["childcare", "early years", "eyfs", "nursery", "teaching assistant", "sen", "safeguarding"],
-    "it": ["it", "cyber", "security", "network", "programming", "python", "data", "ai", "cloud", "software", "computing", "sql", "microsoft", "excel", "office", "coding"],
+    "it": [
+        "it", "cyber", "security", "network", "programming", "python", "data", "ai", "cloud",
+        "software", "computing", "sql", "microsoft", "excel", "office", "coding"
+    ],
     "business": ["business", "management", "leadership", "hr", "marketing", "project", "operations"],
     "health_social_care": ["health", "social care", "care", "adult care", "nursing", "mental health"],
     "education": ["education", "teaching", "teacher", "training", "assessor", "iqa", "quality assurance", "pta", "ta"],
@@ -560,10 +561,23 @@ def shutdown():
     print("✅ Saved persistent memory on shutdown")
 
 
+# ---------------- ADD THIS: browser-friendly GET for /test-chat ----------------
+@app.get("/test-chat")
+def test_chat_get():
+    return {
+        "ok": True,
+        "hint": "This endpoint is POST-only for chatting.",
+        "how_to": "POST JSON: {'text': 'hello', 'convo_id': 'convo-1'}",
+        "try_in_browser": "Open /docs and use POST /test-chat -> Try it out"
+    }
+
+
 # ---------------- Local test chat (UI -> Streamlit uses this) ----------------
 @app.post("/test-chat")
 async def test_chat(payload: dict):
-    text = (payload.get("text") or "").strip()
+    # ✅ Accept both "text" and "message" just in case (optional but helpful)
+    text = (payload.get("text") or payload.get("message") or "").strip()
+
     convo_id = (payload.get("convo_id") or "").strip() or f"convo-{datetime.utcnow().timestamp()}"
 
     if not text:
