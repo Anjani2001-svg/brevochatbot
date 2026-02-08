@@ -12,11 +12,10 @@ import streamlit as st
 # =========================
 BASE_DIR = Path(__file__).resolve().parent
 
-# Backend URL (set this in terminal env or Streamlit secrets if you want)
-# Example: http://127.0.0.1:8000/test-chat
+# Backend URL
 BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000/test-chat")
 
-# Local file just for UI chat history persistence (optional)
+# Local file for UI chat history persistence (optional)
 STORE_FILE = BASE_DIR / "streamlit_chat_store.json"
 
 
@@ -38,12 +37,10 @@ def load_store() -> dict:
     except Exception:
         return {}
 
-
 def save_store(store: dict) -> None:
     tmp = STORE_FILE.with_suffix(".tmp")
     tmp.write_text(json.dumps(store, ensure_ascii=False, indent=2), encoding="utf-8")
     tmp.replace(STORE_FILE)
-
 
 store = load_store()
 
@@ -66,15 +63,10 @@ if not cid:
     except Exception:
         st.experimental_set_query_params(cid=cid)
 
-# Keep this as your UI conversation id (for saving chat history locally)
 st.session_state.convo_id = cid
 
-# Backend conversation id (separate from UI cid)
-if "backend_convo_id" not in st.session_state:
-    st.session_state.backend_convo_id = None
 
-
-# Load messages for this UI conversation
+# Load messages for this conversation
 if "messages" not in st.session_state:
     st.session_state.messages = store.get(cid, [])
 
@@ -87,9 +79,6 @@ with st.sidebar:
     st.caption("Backend endpoint")
     st.code(BACKEND_URL)
 
-    st.caption("Backend convo_id")
-    st.code(st.session_state.backend_convo_id or "None yet")
-
     if st.button("🆕 New conversation"):
         new_cid = f"st-{uuid.uuid4()}"
         try:
@@ -98,7 +87,6 @@ with st.sidebar:
             st.experimental_set_query_params(cid=new_cid)
 
         st.session_state.convo_id = new_cid
-        st.session_state.backend_convo_id = None
         st.session_state.messages = []
         store[new_cid] = []
         save_store(store)
@@ -116,7 +104,7 @@ with st.sidebar:
             st.error(f"Healthcheck error: {e}")
 
     st.divider()
-    st.caption("Tip: If backend is running on a different machine, set BACKEND_URL accordingly.")
+    st.caption("Tip: /test-chat is POST-only. Use /docs to test it in browser.")
 
 
 # =========================
@@ -142,36 +130,21 @@ if user_text:
     reply = ""
     error_msg = None
 
-    # IMPORTANT: backend expects "message" (not "text")
-    payload = {"message": user_text}
-
-    # IMPORTANT: only send backend convo_id after backend gives you one
-    if st.session_state.backend_convo_id:
-        payload["convo_id"] = st.session_state.backend_convo_id
+    payload = {
+        "text": user_text,                    # ✅ matches your FastAPI code
+        "convo_id": st.session_state.convo_id # ✅ stable conversation id
+    }
 
     try:
         res = requests.post(BACKEND_URL, json=payload, timeout=60)
-
-        # Handle non-JSON responses cleanly
         content_type = res.headers.get("content-type", "")
+
         if res.status_code != 200:
             error_msg = f"Backend error ({res.status_code}): {res.text}"
         elif "application/json" in content_type:
             data = res.json()
-
-            # Save backend convo_id for next turns
-            if data.get("convo_id"):
-                st.session_state.backend_convo_id = data["convo_id"]
-
-            # Robust reply extraction
-            reply_val = data.get("reply") or data.get("response") or data.get("answer") or ""
-            if isinstance(reply_val, (dict, list)):
-                reply = json.dumps(reply_val, ensure_ascii=False, indent=2)
-            else:
-                reply = str(reply_val).strip()
-
+            reply = (data.get("reply") or "").strip()
         else:
-            # If backend returns plain text
             reply = res.text.strip()
 
     except Exception as e:
@@ -188,6 +161,7 @@ if user_text:
     with st.chat_message("assistant"):
         st.markdown(reply)
 
-    # Persist messages (keyed by UI cid)
+    # Persist messages
     store[st.session_state.convo_id] = st.session_state.messages
     save_store(store)
+
